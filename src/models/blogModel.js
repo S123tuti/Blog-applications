@@ -10,11 +10,20 @@ const BlogSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    image:{
+     type:String,
+    },
     authorId: {
         type: ObjectId,
         required: true,
         ref: 'Author'
     },
+
+   isDeleted:{
+    type:Boolean,
+    default :false,
+   }
+
 },{timestamps:true});
 
 module.exports = mongoose.model('Blog', BlogSchema) 

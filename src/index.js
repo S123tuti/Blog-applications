@@ -2,10 +2,16 @@ const express = require('express')
 const route = require ('./routes/route.js')
 const mongoose = require('mongoose')
 const app = express()
+const multer = require("multer")
+ require("dotenv").config()
 
 app.use(express.json())
 
-mongoose.connect("",{
+
+app.use(multer().any())
+
+
+mongoose.connect(process.env.Mongo_Url,{
 useNewUrlParser : true
 })
 .then(()=>{
@@ -18,6 +24,8 @@ useNewUrlParser : true
 
 app.use('/' , route)
 
-app.listen(process.env.PORT || 3000 , function(){
-    console.log('Express app is running on port '+(process.env.PORT||3000) )
+let PORT =  process.env.Port || 8081
+
+app.listen(PORT , function(){
+    console.log(`server is running on port ${PORT}` )
 })
