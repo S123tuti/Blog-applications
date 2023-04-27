@@ -1,5 +1,6 @@
 const authorModel = require('../models/authormodel')
 const jwt = require('jsonwebtoken')
+ const userValidator = require("../validator/valid")
 
 
 //-------------------------------------------------- APIs /authors --------------------------------
@@ -11,7 +12,11 @@ const createAuthors =  async function (req, res) {
         if (Object.keys(authorData).length == 0) {
             return res.status(400).send({ status: false, message: "please enter data" })
         }
-
+        const { error, value } = userValidator.validate(authorData);
+        if (error) {
+          return res.status(400).json({ error: error.details[0].message });
+        }
+        console.log(value)
         //====================================Validating fname ================================================
         if (!authorData.fname) {
             return res.status(400).send({ status: false, message: "fname is required" })

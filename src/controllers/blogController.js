@@ -2,6 +2,7 @@ const blogModel = require("../models/blogModel");
 const authorModel = require("../models/authormodel");
 const mongoose = require("mongoose");
 const uploadFile = require("../awsconfig/aws");
+const blogValidator = require("../validator/valid")
 
 //--------------------------------------------POST /blogs---------------------------------------------------
 
@@ -52,6 +53,12 @@ const createNewBlog = async function (req, res) {
     }
 
     data.authorId = blogData.authorId;
+
+    const { error, value } = blogValidator.validate(data);
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
+    console.log(value)
     //========================================  creating blogs ===============================================
     let blogCreated = await blogModel.create(data);
     return res
