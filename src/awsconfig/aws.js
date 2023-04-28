@@ -1,4 +1,5 @@
 const aws = require('aws-sdk')
+require("aws-sdk/lib/maintenance_mode_message").suppress = true;
 
 aws.config.update({
     accessKeyId: "AKIAY3L35MCRZNIRGT6N",

@@ -2,7 +2,7 @@ const blogModel = require("../models/blogModel");
 const authorModel = require("../models/authormodel");
 const mongoose = require("mongoose");
 const uploadFile = require("../awsconfig/aws");
-const blogValidator = require("../validator/valid")
+const {blogValidator,updateBlog} = require("../validator/valid")
 
 //--------------------------------------------POST /blogs---------------------------------------------------
 
@@ -11,35 +11,33 @@ const createNewBlog = async function (req, res) {
     let blogData = req.body;
     const files = req.files;
     let data = {};
-    /// ============================================== title not entered ========================================
-    if (!blogData.title) {
-      return res
-      .status(400)
-      .send({ status: false, msg: "Title is required" });
-    }
+ 
     data.title = blogData.title;
     data.content = blogData.content;
-    //// ============================= authodId not entered ======================================================
-    if (!blogData.authorId) {
-      return res
-        .status(400)
-        .send({ status: false, msg: "AuthorId is required" });
+   
+   
+    if (files && files.length > 0) {
+      data.image = await uploadFile(files[0]); 
     }
-    if (!mongoose.Types.ObjectId.isValid(blogData.authorId)) {
-      return res
-        .status(400)
-        .send({ status: false, msg: "invalid authorId format" });
+    data.authorId = req.body.authorId;
+  
+    
+    if(!blogData.isDeleted){
+       data.isDeleted= false
     }
-    //===================== validating the author if it exist or not =============================================
-    let authorId = await authorModel.findById(blogData.authorId);
+     console.log(req.body)
+    const { error, value } = blogValidator.validate(data);
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
+  
+    let authorId = await authorModel.findById(value.authorId);
     if (!authorId) {
       return res
         .status(404)
         .send({ status: false, msg: "Author doesn't exist" });
     }
-
-    //***************** if author id is not matched with token author id *******************
-    if (!(blogData.authorId == req.loggedInAuthorId)) {
+    if (!(blogData.authorId == req.decode)) {
       return res
       .status(403)
       .send({
@@ -48,19 +46,7 @@ const createNewBlog = async function (req, res) {
       });
     }
 
-    if (files && files.length > 0) {
-      data.Image = await uploadFile(files[0]); //uploading file to aws s3
-    }
-
-    data.authorId = blogData.authorId;
-
-    const { error, value } = blogValidator.validate(data);
-    if (error) {
-      return res.status(400).json({ error: error.details[0].message });
-    }
-    console.log(value)
-    //========================================  creating blogs ===============================================
-    let blogCreated = await blogModel.create(data);
+    let blogCreated = await blogModel.create(value);
     return res
     .status(201)
     .send({
@@ -128,7 +114,7 @@ const updateBlogData = async function (req, res) {
         .status(400)
         .send({ status: false, msg: "Please enter Data to be updated" });
     }
-
+    
     if (title) {
       data.title = title;
     }
@@ -136,20 +122,26 @@ const updateBlogData = async function (req, res) {
     if (content) {
       data.content = content;
     }
+   
     if (file && file.length > 0) {
       let profileImage = await uploadFile(file[0]); //uploading file to aws s3
       data.Image = profileImage;
     }
-
+     const { error,value}= updateBlog.validate(data)
+     if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
+    
     //====================================== updating data =========================================
     let blog = await blogModel.findOneAndUpdate(
-      { _id: blogId, isDeleted: false },
+      { _id: blogId },
       {
-        $set: { data },
+        $set: { value },
       },
       { new: true }
     );
     //==================== if get null or blog not found or blog is deleted =============================================
+  
     if (!blog) {
       return res
         .status(404)
@@ -176,9 +168,10 @@ const deleteBlogs = async function (req, res) {
         .status(404)
         .send({ status: true, message: "blog is not exist" });
     //=============================== if blog is not deleted and want to delete it ====================
-    let deletedBlog = await blogModel.findOneAndUpdate(
+   await blogModel.findOneAndUpdate(
       { _id: blogIdData },
-      { isDeleted: true, deletedAt: new Date() }
+    { $set:{ isDeleted: true}},
+      {new:true}
     );
     return res
       .status(200)

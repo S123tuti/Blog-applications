@@ -1,54 +1,78 @@
-const jwt = require('jsonwebtoken')
-const blogModel = require('../models/blogModel')
-const mongoose = require('mongoose')
+const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
+const  blogModel = require("../models/blogModel")
 
+//Global Function
+function isvalidObjectId(ObjectId) {
+  return mongoose.Types.ObjectId.isValid(ObjectId);
+}
+
+//Authentication
 const authentication = function (req, res, next) {
-    try {
-        let token = req.headers["x-api-key"];
-        if (!token) token = req.headers["X-api-key"]; //=======handleing case sensitivty =========================
-        if (!token) {
-            return res.status(401).send({ status: false, msg: "token must be present" })
-        };
-        //============================= decoding the token ========================================
-        let decodedToken = jwt.verify(token, "Blogging_site", function (error, decodedToken) {
-            if (error) {
-                return res.status(401).send({ status: false, msg: "token is invalid" })
-            } else {
-                req.loggedInAuthorId = decodedToken._id
-                next()
-            }
-        });
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).send('Unauthorized');
     }
-    catch (error) {
-        return res.status(500).send({ status: false, Error: error.message })
+    const tokenCheck = authHeader.split(' ')[1];
+    //Verifying
+  
+    jwt.verify(tokenCheck, process.env.Jwt_secret, (err, decode) => {
+      if (err) {
+        let msg =
+          err.message == "jwt expired"
+            ? "Token is Expired !!! "
+            : "Token is Invalid !!!";
+
+        return res.status(401).send({ status: false, msg: msg });
+      }
+
+      req["decode"] = decode.userId;
+
+      next();
+    });
+  } catch (err) {
+    return res.status(500).send({
+      status: false,
+      msg: "Server Error  authentication!!!",
+      ErrMsg: err.message,
+    });
+  }
+};
+
+//Authorization
+
+const authorization =  async function (req, res, next) {
+  try {
+    if (req.params) {
+      if (!isvalidObjectId(req.params.blogId)) {
+        return res
+          .status(400)
+          .send({ status: false, msg: "Not a valid UserId" });
+      }
+      
+      const blogId = req.params.blogId
+      const blog = await  blogModel.findById({ _id:blogId})
+      if (blog.authorId == req.decode) {
+        next();
+      } else {
+        return res
+          .status(403)
+          .send({ status: false, msg: "not Authorized User!!!" });
+      }
+    } else {
+      return res
+        .status(400)
+        .send({ status: false, msg: "userId is require in params" });
     }
-
-}
-
-const authorisation = async function (req, res, next) {
-    try {
-        let blogToBeModified = req.params.blogId
-        //========================= if blogId is not valid ================================================
-        if (!mongoose.isValidObjectId(blogToBeModified)) {
-            return res.status(400).send({ status: false, msg: "invalid blogId format" });
-        }
-        //================================= to check authority ===========================================
-        let blog = await blogModel.findById({ _id: blogToBeModified })
-        if (blog) {
-            if (blog.authorId != req.loggedInAuthorId) {
-                return res.status(403).send({ status: false, msg: 'Author loggedIn is not allowed to modify the requested data' })
-            } else {
-                next()
-            }
-        }
-        else {
-            return res.status(404).send({ status: false, msg: "blogId does not exist" })
-        }
-    }
-    catch (error) {
-        return res.status(500).send({ status: false, Error: error.message })
-    }
-}
+  } catch (err) {
+    return res.status(500).send({
+      status: false,
+      msg: "Server Error authorization !!!",
+      err: err.message,
+    });
+  }
+};
 
 
-module.exports = { authentication, authorisation}
+module.exports = {authentication,authorization}
